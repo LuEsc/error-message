@@ -5,7 +5,7 @@
   "compilerOptions": {
     "paths": {
       "error-message": [
-        "./dist/error-message"
+        "./dist"
       ]
     },
     "outDir": "./dist/out-tsc",

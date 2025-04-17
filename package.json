@@ -1,5 +1,5 @@
 {
-  "name": "@lummen/error",
+  "name": "@solvia/ng-message-handler",
   "version": "0.0.1",
   "author": "Lummen",
   "description": "A reusable and scalable Angular component library designed for clean, consistent, and elegant user interfaces.",

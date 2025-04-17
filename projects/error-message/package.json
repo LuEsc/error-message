@@ -1,5 +1,5 @@
 {
-  "name": "error-message",
+  "name": "@solvia/ng-message-handler",
   "version": "0.0.1",
   "peerDependencies": {
     "@angular/common": "^19.2.0",
