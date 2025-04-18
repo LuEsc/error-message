@@ -16,7 +16,7 @@ export class AppComponent {
   constructor(){
     this.form = new FormGroup<any>(
       {
-        email: new FormControl('', Validators.email),
+        email: new FormControl('', [Validators.email, Validators.required, Validators.maxLength(8)]),
         nombre: new FormControl('', Validators.required),
         calle: new FormControl('', Validators.required)
       }

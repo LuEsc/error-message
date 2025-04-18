@@ -1,6 +1,14 @@
 {
   "name": "@solvia/ng-message-handler",
-  "version": "0.0.4",
+  "version": "0.0.5",
+  "author": "Lummen",
+  "description": "A reusable and scalable Angular component library designed for clean, consistent, and elegant user interfaces.",
+  "keywords": ["angular", "library", "ui", "components", "reusable", "frontend", "design-system", "typescript"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LuEsc/error-message"
+  },
   "peerDependencies": {
     "@angular/common": "^19.2.0",
     "@angular/core": "^19.2.0"
