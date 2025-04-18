@@ -1,255 +1,114 @@
 import {
   Component,
-  computed,
-  forwardRef,
-  inject,
-  input,
-  signal
+  Input,
+  OnInit,
+  OnDestroy,
+  Optional,
+  SkipSelf
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import {
-  ControlValueAccessor,
-  NG_VALUE_ACCESSOR,
-  NgControl,
-  ValidationErrors
+  AbstractControl,
+  ControlContainer
 } from '@angular/forms';
 import { ErrorMessageProviderService } from '../service/message-provider.service';
 import { ErrorMessages } from '../types/error-message';
+import { Subscription } from 'rxjs';
 
-/**
- * Error Message Component
- *
- * A reusable component that displays form validation errors.
- * It implements ControlValueAccessor to seamlessly integrate with Angular's form system.
- *
- * @example
- * <form [formGroup]="form">
- *   <input formControlName="email" type="email">
- *   <lmn-error-message formControlName="email"></lmn-error-message>
- * </form>
- *
- * @example With custom messages
- * <lmn-error-message
- *   formControlName="name"
- *   [customMessages]="{required: 'Name is mandatory'}"
- *   errorClass="custom-error">
- * </lmn-error-message>
- */
 @Component({
   selector: 'lmn-error-message',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
-    @if (shouldShowError()) {
-      <div [class]="errorClassValue()">{{ errorMessage() }}</div>
+    @if (hasError) {
+      <div>{{ errorMessage }}</div>
     }
-  `,
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => LmnErrorMessageComponent),
-      multi: true
-    }
-  ]
+  `
 })
-export class LmnErrorMessageComponent implements ControlValueAccessor {
-  // Injected services
-  private errorProvider = inject(ErrorMessageProviderService);
-  private ngControl = inject(NgControl, { optional: true, self: true });
+export class LmnErrorMessageComponent implements OnInit, OnDestroy {
+  @Input() customMessages: ErrorMessages = {};
+  @Input() showOnlyWhenDirty = false;
+  @Input() controlName?: string;
+  @Input() debug = false;
 
-  // Inputs
-  /**
-   * Custom error messages for this specific instance
-   * @example {required: 'This field is mandatory', minlength: (error) => `Min ${error.requiredLength} chars`}
-   */
-  customMessages = input<ErrorMessages>({});
+  hasError = false;
+  errorMessage = '';
+  private control: AbstractControl | null = null;
+  private subscription?: Subscription;
 
-  /**
-   * CSS class to apply to the error message container
-   */
-  errorClass = input<string>('error-message');
-
-  /**
-   * Whether to show errors only when the field has been touched
-   */
-  showOnlyWhenTouched = input<boolean>(true);
-
-  /**
-   * Whether to show errors only when the field has been modified
-   */
-  showOnlyWhenDirty = input<boolean>(false);
-
-  // Internal signals
-  /**
-   * The current value of the form control
-   */
-  private value = signal<any>(null);
-
-  /**
-   * Whether the form control has been touched
-   */
-  private touched = signal<boolean>(false);
-
-  /**
-   * Whether the form control has been modified
-   */
-  private dirty = signal<boolean>(false);
-
-  /**
-   * The current validation errors
-   */
-  private errors = signal<ValidationErrors | null>(null);
-
-  // Computed values
-  /**
-   * The CSS class to apply to the error message
-   */
-  public errorClassValue = computed(() => this.errorClass());
-
-  /**
-   * Combined global and custom error messages
-   */
-  private combinedMessages = computed(() => {
-    return {
-      ...this.errorProvider.getMessages(),
-      ...this.customMessages()
-    };
-  });
-
-  // ControlValueAccessor callbacks
-  /**
-   * Callback for when the value changes
-   */
-  private onChange: (value: any) => void = () => {};
-
-  /**
-   * Callback for when the field is touched
-   */
-  private onTouched: () => void = () => {};
-
-  constructor() {
-    // Set up the connection to NgControl after the component is initialized
-    setTimeout(() => {
-      if (this.ngControl) {
-        // Connect to the parent form control
-        this.setupControlConnection();
-      }
-    });
+  constructor(
+    @Optional() @SkipSelf() private controlContainer: ControlContainer,
+    @Optional() private readonly errorProvider: ErrorMessageProviderService
+  ) {
+    this.errorProvider = this.errorProvider || new ErrorMessageProviderService();
   }
 
-  /**
-   * Sets up the connection to the parent form control
-   */
-  private setupControlConnection(): void {
-    if (!this.ngControl || !this.ngControl.control) return;
-
-    // Initial state synchronization
-    this.updateErrors(this.ngControl.control.errors);
-    this.touched.set(this.ngControl.control.touched);
-    this.dirty.set(this.ngControl.control.dirty);
-
-    // Subscribe to state changes
-    this.ngControl.control.statusChanges.subscribe(() => {
-      if (!this.ngControl || !this.ngControl.control) return;
-
-      this.updateErrors(this.ngControl.control.errors);
-      this.touched.set(this.ngControl.control.touched);
-      this.dirty.set(this.ngControl.control.dirty);
-    });
-  }
-
-  // Computed signals for display logic
-  /**
-   * Determines whether the error message should be displayed
-   */
-  shouldShowError = computed(() => {
-    if (!this.errors() || Object.keys(this.errors() || {}).length === 0) {
-      return false;
+  ngOnInit(): void {
+    if (!this.controlName || !this.controlContainer?.control) {
+      console.warn('LmnErrorMessage: No control name or control container found');
+      return;
     }
 
-    const shouldCheckTouched = this.showOnlyWhenTouched();
-    const shouldCheckDirty = this.showOnlyWhenDirty();
+    this.control = this.controlContainer.control.get(this.controlName) || null;
 
-    return (!shouldCheckTouched || this.touched()) &&
-      (!shouldCheckDirty || this.dirty());
-  });
+    if (!this.control) {
+      console.warn(`LmnErrorMessage: No control found with name '${this.controlName}'`);
+      return;
+    }
 
-  /**
-   * Computes the error message to display
-   */
-  errorMessage = computed(() => {
-    if (!this.errors()) return '';
+    this.subscription = this.control.statusChanges.subscribe(() => {
+      this.checkErrors();
+    });
 
-    // Get the first error key
-    const errorKey = Object.keys(this.errors() || {})[0];
-    if (!errorKey) return '';
-
-    const errorValue = this.errors()?.[errorKey];
-    const messages = this.combinedMessages();
-
-    // Find the custom message or use the default
-    const message = messages[errorKey];
-
-    if (!message) return `Error: ${errorKey}`;
-
-    // If the message is a function, execute it with the error value
-    return typeof message === 'function' ? message(errorValue) : message;
-  });
-
-  // ControlValueAccessor implementation
-  /**
-   * Writes a new value to the form control
-   * @param value - The new value
-   */
-  writeValue(value: any): void {
-    this.value.set(value);
+    this.checkErrors();
   }
 
-  /**
-   * Registers a callback function that is called when the control's value changes
-   * @param fn - The callback function
-   */
-  registerOnChange(fn: (value: any) => void): void {
-    this.onChange = fn;
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
   }
 
-  /**
-   * Registers a callback function that is called when the control is touched
-   * @param fn - The callback function
-   */
-  registerOnTouched(fn: () => void): void {
-    this.onTouched = fn;
+  private checkErrors(): void {
+    if (!this.control) {
+      this.hasError = false;
+      return;
+    }
+
+    const hasErrors = !!this.control.errors;
+    const isInvalid = this.control.invalid;
+    const isDirty = !this.showOnlyWhenDirty || this.control.dirty;
+
+    this.hasError = hasErrors && isInvalid && isDirty;
+
+    if (this.hasError) {
+      this.errorMessage = this.getErrorMessage();
+    }
+
+    if (this.debug) {
+      console.log('[LmnErrorMessage] Error Check:', {
+        control: this.controlName,
+        errors: this.control.errors,
+        hasErrors,
+        invalid: isInvalid,
+        dirty: isDirty,
+        hasError: this.hasError
+      });
+    }
   }
 
-  /**
-   * Sets the disabled state of the control
-   * @param isDisabled - Whether the control is disabled
-   */
-  setDisabledState?(isDisabled: boolean): void {
-    // Not needed for this component
-  }
+  private getErrorMessage(): string {
+    if (!this.control?.errors) return '';
 
-  // Public methods for manual updates
-  /**
-   * Updates the validation errors
-   * @param errors - The new validation errors
-   */
-  updateErrors(errors: ValidationErrors | null): void {
-    this.errors.set(errors);
-  }
+    const errorKey = Object.keys(this.control.errors)[0];
+    const errorValue = this.control.errors[errorKey];
 
-  /**
-   * Marks the control as touched
-   */
-  markAsTouched(): void {
-    this.touched.set(true);
-    this.onTouched();
-  }
+    const allMessages = {
+      ...this.errorProvider.getMessages(),
+      ...this.customMessages
+    };
 
-  /**
-   * Marks the control as dirty (modified)
-   */
-  markAsDirty(): void {
-    this.dirty.set(true);
+    const message = allMessages[errorKey];
+
+    return typeof message === 'function'
+      ? message(errorValue)
+      : message ?? `Error: ${errorKey}`;
   }
 }

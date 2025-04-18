@@ -1,0 +1,14 @@
+<form [formGroup]="form">
+  <div>
+    <label>Email</label>
+    <input formControlName="email">
+    <lmn-error-message controlName="email" [debug]="true" class="my-error-class"></lmn-error-message>
+  </div>
+
+  <div>
+    <label>Nombre</label>
+    <input formControlName="nombre">
+  </div>
+  <lmn-error-message controlName="nombre" class="my-error-class"></lmn-error-message>
+
+</form>

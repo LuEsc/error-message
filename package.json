@@ -1,6 +1,6 @@
 {
   "name": "@solvia/ng-message-handler",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "author": "Lummen",
   "description": "A reusable and scalable Angular component library designed for clean, consistent, and elegant user interfaces.",
   "keywords": ["angular", "library", "ui", "components", "reusable", "frontend", "design-system", "typescript"],
